@@ -9,6 +9,7 @@ import {
   VoiceConnectionStatus,
 } from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
+import { container } from "@sapphire/framework";
 import { Subcommand } from "@sapphire/plugin-subcommands";
 import { InteractionResponse } from "discord.js";
 import { playlist_info, stream, video_info } from "play-dl";
@@ -134,9 +135,10 @@ export class UserCommand extends Subcommand {
       });
 
       return await interaction.reply({
-        content: `Added the following songs to the queue: \n ${addedSongs.map((song, index) => `${index + 1}. ${song.title}`).join("\n")}`,
+        content: `Added ${addedSongs.length} song${addedSongs.length > 1 ? "s" : ""} to the queue!`,
       });
-    } catch {
+    } catch (error) {
+      this.container.logger.fatal(error);
       return interaction.reply({ content: "Something went wrong!", ephemeral: true });
     }
   }
@@ -161,7 +163,8 @@ export class UserCommand extends Subcommand {
       }
       this.playCurrentSong();
       return await interaction.reply({ content: `Skipped ${skippedSong.title}` });
-    } catch {
+    } catch (error) {
+      this.container.logger.fatal(error);
       return interaction.reply({ content: "Something went wrong!", ephemeral: true });
     }
   }
@@ -175,7 +178,8 @@ export class UserCommand extends Subcommand {
       this.connection?.disconnect();
       this.connection = null;
       return await interaction.reply({ content: "Stopped the music!" });
-    } catch {
+    } catch (error) {
+      this.container.logger.fatal(error);
       return interaction.reply({ content: "Something went wrong!", ephemeral: true });
     }
   }
@@ -187,7 +191,8 @@ export class UserCommand extends Subcommand {
       }
       const queue = this.queue.map((song, index) => `${index + 1}. ${song.title}`).join("\n");
       return await interaction.reply({ content: queue });
-    } catch {
+    } catch (error) {
+      this.container.logger.fatal(error);
       return interaction.reply({ content: "Something went wrong!", ephemeral: true });
     }
   }
@@ -209,13 +214,16 @@ export class UserCommand extends Subcommand {
         this.queue.push({ url: video.url, title: video.title });
       }
       return songs;
-    } catch {
+    } catch (error) {
+      this.container.logger.fatal(error);
+
       try {
         const info = await video_info(url);
         songs.push({ url: info.video_details.url, title: info.video_details.title });
         this.queue.push({ url: info.video_details.url, title: info.video_details.title });
         return songs;
-      } catch {
+      } catch (error_) {
+        this.container.logger.fatal(error_);
         throw new Error("Invalid URL!");
       }
     }
