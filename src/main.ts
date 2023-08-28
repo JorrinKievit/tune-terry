@@ -1,8 +1,8 @@
 import { LogLevel, SapphireClient } from "@sapphire/framework";
 import { GatewayIntentBits, Partials } from "discord.js";
-import dotenv from "dotenv";
+import { config } from "dotenv";
 
-dotenv.config();
+config();
 
 const client = new SapphireClient({
   defaultPrefix: "!tt",

@@ -126,16 +126,17 @@ export class UserCommand extends Subcommand {
 
       this.connection.on(VoiceConnectionStatus.Destroyed, () => {
         this.queue = [];
+        this.connection = null;
       });
       this.connection.on(VoiceConnectionStatus.Disconnected, () => {
         this.queue = [];
+        this.connection = null;
       });
 
       return await interaction.reply({
         content: `Added the following songs to the queue: \n ${addedSongs.map((song, index) => `${index + 1}. ${song.title}`).join("\n")}`,
       });
-    } catch (error) {
-      console.log(error);
+    } catch {
       return interaction.reply({ content: "Something went wrong!", ephemeral: true });
     }
   }
@@ -172,6 +173,7 @@ export class UserCommand extends Subcommand {
       }
       this.queue = [];
       this.connection?.disconnect();
+      this.connection = null;
       return await interaction.reply({ content: "Stopped the music!" });
     } catch {
       return interaction.reply({ content: "Something went wrong!", ephemeral: true });
