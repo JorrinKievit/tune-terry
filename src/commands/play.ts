@@ -42,6 +42,11 @@ interface MusicQueue {
       type: "method",
       chatInputRun: "list",
     },
+    {
+      name: "current",
+      type: "method",
+      chatInputRun: "current",
+    },
   ],
 })
 export class UserCommand extends Subcommand {
@@ -62,9 +67,15 @@ export class UserCommand extends Subcommand {
             .setDescription("Play a song or playlist using a YouTube URL")
             .addStringOption((option) => option.setName("url").setDescription("The URL to play").setRequired(true)),
         )
-        .addSubcommand((command) => command.setName("skip").setDescription("Skip the current song"))
+        .addSubcommand((command) =>
+          command
+            .setName("skip")
+            .setDescription("Skip the current song")
+            .addNumberOption((option) => option.setName("number").setDescription("The song to skip to in the queue")),
+        )
         .addSubcommand((command) => command.setName("stop").setDescription("Stop the music"))
-        .addSubcommand((command) => command.setName("list").setDescription("List the current queue")),
+        .addSubcommand((command) => command.setName("list").setDescription("List the current queue"))
+        .addSubcommand((command) => command.setName("current").setDescription("Get the current song")),
     );
   }
 
@@ -78,21 +89,30 @@ export class UserCommand extends Subcommand {
         return await interaction.reply({ content: "You must be in a voice channel to use this command!", ephemeral: true });
       }
 
-      this.connection = joinVoiceChannel({
-        channelId: voiceChannel.id,
-        guildId: interaction.guildId,
-        adapterCreator: interaction.guild.voiceAdapterCreator,
-      });
-
-      if (this.queue.length === 0) {
-        await this.addQueue(url);
+      if (!voiceChannel.joinable) {
+        return await interaction.reply({ content: "I don't have permission to join that voice channel!", ephemeral: true });
       }
-      this.player = createAudioPlayer({
-        behaviors: {
-          noSubscriber: NoSubscriberBehavior.Play,
-        },
-      });
-      this.playCurrentSong();
+
+      if (!this.connection) {
+        this.connection = joinVoiceChannel({
+          channelId: voiceChannel.id,
+          guildId: interaction.guildId,
+          adapterCreator: interaction.guild.voiceAdapterCreator,
+        });
+      }
+
+      const addedSongs = await this.addQueue(url);
+
+      if (!this.player) {
+        this.player = createAudioPlayer({
+          behaviors: {
+            noSubscriber: NoSubscriberBehavior.Play,
+          },
+        });
+      }
+      if (this.player.state.status !== AudioPlayerStatus.Playing) {
+        this.playCurrentSong();
+      }
 
       this.player.on(AudioPlayerStatus.Idle, () => {
         this.queue.shift();
@@ -111,8 +131,11 @@ export class UserCommand extends Subcommand {
         this.queue = [];
       });
 
-      return await interaction.reply({ content: `Added ${this.queue.length} songs to the queue!`, ephemeral: true });
-    } catch {
+      return await interaction.reply({
+        content: `Added the following songs to the queue: \n ${addedSongs.map((song, index) => `${index + 1}. ${song.title}`).join("\n")}`,
+      });
+    } catch (error) {
+      console.log(error);
       return interaction.reply({ content: "Something went wrong!", ephemeral: true });
     }
   }
@@ -122,9 +145,21 @@ export class UserCommand extends Subcommand {
       if (this.queue.length === 0) {
         return await interaction.reply({ content: "There are no songs in the queue!", ephemeral: true });
       }
-      this.queue.shift();
+      const number = interaction.options.getNumber("number");
+      let skippedSong: MusicQueue;
+
+      if (number) {
+        if (number > this.queue.length) {
+          return await interaction.reply({ content: "That song doesn't exist in the queue!", ephemeral: true });
+        }
+        skippedSong = this.queue[number - 2];
+        this.queue = this.queue.slice(number - 1);
+      } else {
+        skippedSong = this.queue[0];
+        this.queue = this.queue.slice(1);
+      }
       this.playCurrentSong();
-      return await interaction.reply({ content: "Skipped the current song!", ephemeral: true });
+      return await interaction.reply({ content: `Skipped ${skippedSong.title}` });
     } catch {
       return interaction.reply({ content: "Something went wrong!", ephemeral: true });
     }
@@ -137,7 +172,7 @@ export class UserCommand extends Subcommand {
       }
       this.queue = [];
       this.connection?.disconnect();
-      return await interaction.reply({ content: "Stopped the music!", ephemeral: true });
+      return await interaction.reply({ content: "Stopped the music!" });
     } catch {
       return interaction.reply({ content: "Something went wrong!", ephemeral: true });
     }
@@ -149,23 +184,35 @@ export class UserCommand extends Subcommand {
         return await interaction.reply({ content: "There are no songs in the queue!", ephemeral: true });
       }
       const queue = this.queue.map((song, index) => `${index + 1}. ${song.title}`).join("\n");
-      return await interaction.reply({ content: queue, ephemeral: true });
+      return await interaction.reply({ content: queue });
     } catch {
       return interaction.reply({ content: "Something went wrong!", ephemeral: true });
     }
   }
 
-  private addQueue = async (url: string): Promise<void> => {
+  public async current(interaction: Subcommand.ChatInputCommandInteraction): Promise<InteractionResponse<boolean>> {
+    if (this.queue.length === 0) {
+      return interaction.reply({ content: "There are no songs in the queue!", ephemeral: true });
+    }
+    return interaction.reply({ content: this.queue[0].title });
+  }
+
+  private addQueue = async (url: string): Promise<MusicQueue[]> => {
+    const songs: MusicQueue[] = [];
     try {
       const info = await playlist_info(url);
       const videos = await info.all_videos();
       for (const video of videos) {
+        songs.push({ url: video.url, title: video.title });
         this.queue.push({ url: video.url, title: video.title });
       }
+      return songs;
     } catch {
       try {
         const info = await video_info(url);
+        songs.push({ url: info.video_details.url, title: info.video_details.title });
         this.queue.push({ url: info.video_details.url, title: info.video_details.title });
+        return songs;
       } catch {
         throw new Error("Invalid URL!");
       }
