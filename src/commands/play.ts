@@ -121,16 +121,22 @@ export class UserCommand extends Subcommand {
           this.playCurrentSong();
         } else {
           this.connection?.disconnect();
+          this.connection?.destroy();
+          this.connection = null;
         }
       });
       this.connection.subscribe(this.player);
 
       this.connection.on(VoiceConnectionStatus.Destroyed, () => {
         this.queue = [];
+        this.connection?.disconnect();
+        this.connection?.destroy();
         this.connection = null;
       });
       this.connection.on(VoiceConnectionStatus.Disconnected, () => {
         this.queue = [];
+        this.connection?.disconnect();
+        this.connection?.destroy();
         this.connection = null;
       });
 
