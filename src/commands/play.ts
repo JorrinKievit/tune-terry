@@ -175,7 +175,7 @@ export class UserCommand extends Subcommand {
         return await interaction.reply({ content: "There are no songs in the queue!", ephemeral: true });
       }
       this.queue = [];
-      this.connection?.disconnect();
+      this.connection?.destroy();
       this.connection = null;
       return await interaction.reply({ content: "Stopped the music!" });
     } catch (error) {
