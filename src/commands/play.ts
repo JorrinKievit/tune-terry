@@ -9,10 +9,11 @@ import {
   VoiceConnectionStatus,
 } from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
-import { container } from "@sapphire/framework";
 import { Subcommand } from "@sapphire/plugin-subcommands";
 import { InteractionResponse } from "discord.js";
 import { playlist_info, stream, video_info } from "play-dl";
+
+import { formatError } from "../utils/error";
 
 interface MusicQueue {
   url: string;
@@ -120,24 +121,18 @@ export class UserCommand extends Subcommand {
         if (this.queue.length > 0) {
           this.playCurrentSong();
         } else {
-          this.connection?.disconnect();
-          this.connection?.destroy();
-          this.connection = null;
+          this.closeConnection();
         }
       });
       this.connection.subscribe(this.player);
 
       this.connection.on(VoiceConnectionStatus.Destroyed, () => {
         this.queue = [];
-        this.connection?.disconnect();
-        this.connection?.destroy();
-        this.connection = null;
+        this.closeConnection();
       });
       this.connection.on(VoiceConnectionStatus.Disconnected, () => {
         this.queue = [];
-        this.connection?.disconnect();
-        this.connection?.destroy();
-        this.connection = null;
+        this.closeConnection();
       });
 
       return await interaction.reply({
@@ -145,7 +140,7 @@ export class UserCommand extends Subcommand {
       });
     } catch (error) {
       this.container.logger.fatal(error);
-      return interaction.reply({ content: "Something went wrong!", ephemeral: true });
+      return interaction.reply({ content: formatError(error), ephemeral: true });
     }
   }
 
@@ -171,7 +166,7 @@ export class UserCommand extends Subcommand {
       return await interaction.reply({ content: `Skipped ${skippedSong.title}` });
     } catch (error) {
       this.container.logger.fatal(error);
-      return interaction.reply({ content: "Something went wrong!", ephemeral: true });
+      return interaction.reply({ content: formatError(error), ephemeral: true });
     }
   }
 
@@ -181,12 +176,11 @@ export class UserCommand extends Subcommand {
         return await interaction.reply({ content: "There are no songs in the queue!", ephemeral: true });
       }
       this.queue = [];
-      this.connection?.destroy();
-      this.connection = null;
+      this.closeConnection();
       return await interaction.reply({ content: "Stopped the music!" });
     } catch (error) {
       this.container.logger.fatal(error);
-      return interaction.reply({ content: "Something went wrong!", ephemeral: true });
+      return interaction.reply({ content: formatError(error), ephemeral: true });
     }
   }
 
@@ -199,7 +193,7 @@ export class UserCommand extends Subcommand {
       return await interaction.reply({ content: queue });
     } catch (error) {
       this.container.logger.fatal(error);
-      return interaction.reply({ content: "Something went wrong!", ephemeral: true });
+      return interaction.reply({ content: formatError(error), ephemeral: true });
     }
   }
 
@@ -239,5 +233,10 @@ export class UserCommand extends Subcommand {
     const playStream = await stream(this.queue[0].url);
     const resource = createAudioResource(playStream.stream, { inputType: playStream.type });
     this.player?.play(resource);
+  };
+
+  private closeConnection = (): void => {
+    this.connection?.destroy();
+    this.connection = null;
   };
 }
