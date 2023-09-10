@@ -76,7 +76,12 @@ export class UserCommand extends Subcommand {
             .addNumberOption((option) => option.setName("number").setDescription("The song to skip to in the queue")),
         )
         .addSubcommand((command) => command.setName("stop").setDescription("Stop the music"))
-        .addSubcommand((command) => command.setName("list").setDescription("List the current queue"))
+        .addSubcommand((command) =>
+          command
+            .setName("list")
+            .setDescription("List the current queue")
+            .addNumberOption((option) => option.setName("page").setDescription("The page to view (30 songs per page)").setMinValue(1)),
+        )
         .addSubcommand((command) => command.setName("current").setDescription("Get the current song")),
     );
   }
@@ -185,11 +190,19 @@ export class UserCommand extends Subcommand {
   }
 
   public async list(interaction: Subcommand.ChatInputCommandInteraction): Promise<InteractionResponse<boolean>> {
+    const page = interaction.options.getNumber("page") ?? 1;
+
     try {
       if (this.queue.length === 0) {
         return await interaction.reply({ content: "There are no songs in the queue!", ephemeral: true });
       }
-      const queue = this.queue.map((song, index) => `${index + 1}. ${song.title}`).join("\n");
+
+      const queue = this.queue
+        .map((song, index) => `${index + 1}. ${song.title}`)
+        .slice((page - 1) * 30, page * 30)
+        .join("\n")
+        .slice(0, 2000);
+
       return await interaction.reply({ content: queue });
     } catch (error) {
       this.container.logger.fatal(error);
@@ -206,27 +219,37 @@ export class UserCommand extends Subcommand {
 
   private addQueue = async (url: string): Promise<MusicQueue[]> => {
     const songs: MusicQueue[] = [];
-    try {
-      const info = await playlist_info(url);
-      const videos = await info.all_videos();
-      for (const video of videos) {
-        songs.push({ url: video.url, title: video.title });
-        this.queue.push({ url: video.url, title: video.title });
-      }
-      return songs;
-    } catch (error) {
-      this.container.logger.fatal(error);
 
+    if (url.includes("playlist")) {
+      try {
+        const info = await playlist_info(url, {
+          incomplete: true,
+        });
+        const videos = await info.all_videos();
+        for (const video of videos) {
+          songs.push({ url: video.url, title: video.title });
+          this.queue.push({ url: video.url, title: video.title });
+        }
+        return songs;
+      } catch (error) {
+        this.container.logger.fatal(error);
+        throw new Error("Invalid playlist URL!");
+      }
+    }
+
+    if (url.includes("watch")) {
       try {
         const info = await video_info(url);
         songs.push({ url: info.video_details.url, title: info.video_details.title });
         this.queue.push({ url: info.video_details.url, title: info.video_details.title });
         return songs;
-      } catch (error_) {
-        this.container.logger.fatal(error_);
-        throw new Error("Invalid URL!");
+      } catch (error) {
+        this.container.logger.fatal(error);
+        throw new Error("Invalid watch URL!");
       }
     }
+
+    throw new Error("Invalid URL!");
   };
 
   private playCurrentSong = async (): Promise<void> => {
