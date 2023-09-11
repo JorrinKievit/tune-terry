@@ -11,13 +11,36 @@ import {
 import { ApplyOptions } from "@sapphire/decorators";
 import { Subcommand } from "@sapphire/plugin-subcommands";
 import { InteractionResponse } from "discord.js";
-import { playlist_info, stream, video_info } from "play-dl";
+import {
+  is_expired,
+  playlist_info,
+  refreshToken,
+  search,
+  setToken,
+  spotify,
+  SpotifyAlbum,
+  SpotifyPlaylist,
+  SpotifyTrack,
+  stream,
+  validate,
+  video_info,
+} from "play-dl";
 
 import { formatError } from "../utils/error";
+
+setToken({
+  spotify: {
+    client_id: process.env.SPOTIFY_CLIENT_ID,
+    client_secret: process.env.SPOTIFY_CLIENT_SECRET,
+    refresh_token: process.env.SPOTIFY_REFRESH_TOKEN,
+    market: "US",
+  },
+});
 
 interface MusicQueue {
   url: string;
   title?: string;
+  type: "youtube" | "spotify";
 }
 
 @ApplyOptions<Subcommand.Options>({
@@ -66,7 +89,7 @@ export class UserCommand extends Subcommand {
         .addSubcommand((command) =>
           command
             .setName("play")
-            .setDescription("Play a song or playlist using a YouTube URL")
+            .setDescription("Play a song or playlist using a YouTube or Spotify URL")
             .addStringOption((option) => option.setName("url").setDescription("The URL to play").setRequired(true)),
         )
         .addSubcommand((command) =>
@@ -108,6 +131,10 @@ export class UserCommand extends Subcommand {
         });
       }
 
+      if (is_expired()) {
+        await refreshToken();
+      }
+
       const addedSongs = await this.addQueue(url);
 
       if (!this.player) {
@@ -133,7 +160,6 @@ export class UserCommand extends Subcommand {
 
       this.connection.on(VoiceConnectionStatus.Destroyed, () => {
         this.queue = [];
-        this.closeConnection();
       });
       this.connection.on(VoiceConnectionStatus.Disconnected, () => {
         this.queue = [];
@@ -220,15 +246,51 @@ export class UserCommand extends Subcommand {
   private addQueue = async (url: string): Promise<MusicQueue[]> => {
     const songs: MusicQueue[] = [];
 
-    if (url.includes("playlist")) {
+    const validatedUrl = await validate(url);
+
+    if (validatedUrl === "sp_track" || validatedUrl === "sp_album" || validatedUrl === "sp_playlist") {
+      const spData = await spotify(url);
+      this.container.logger.info(validatedUrl);
+      if (validatedUrl === "sp_track") {
+        const searched = await search(
+          `${(spData as SpotifyTrack).artists?.map((artist) => artist.name).join(", ")} | ${(spData as SpotifyTrack).name}`,
+          {
+            limit: 1,
+          },
+        );
+        songs.push({ url: searched[0].url, title: searched[0].title, type: "youtube" });
+        this.queue.push({ url: searched[0].url, title: searched[0].title, type: "youtube" });
+      }
+
+      if (validatedUrl === "sp_album" || validatedUrl === "sp_playlist") {
+        const allTracks = await (spData as SpotifyPlaylist | SpotifyAlbum).all_tracks();
+        this.container.logger.info(allTracks.map((track) => track.name));
+        for (const track of allTracks) {
+          songs.push({
+            url: track.url,
+            title: `${track.artists?.map((artist) => artist.name).join(", ")} | ${track.name}`,
+            type: "spotify",
+          });
+          this.queue.push({
+            url: track.url,
+            title: `${track.artists?.map((artist) => artist.name).join(", ")} | ${track.name}`,
+            type: "spotify",
+          });
+        }
+      }
+
+      return songs;
+    }
+
+    if (validatedUrl === "yt_playlist") {
       try {
         const info = await playlist_info(url, {
           incomplete: true,
         });
         const videos = await info.all_videos();
         for (const video of videos) {
-          songs.push({ url: video.url, title: video.title });
-          this.queue.push({ url: video.url, title: video.title });
+          songs.push({ url: video.url, title: video.title, type: "youtube" });
+          this.queue.push({ url: video.url, title: video.title, type: "youtube" });
         }
         return songs;
       } catch (error) {
@@ -237,11 +299,11 @@ export class UserCommand extends Subcommand {
       }
     }
 
-    if (url.includes("watch")) {
+    if (validatedUrl === "yt_video") {
       try {
         const info = await video_info(url);
-        songs.push({ url: info.video_details.url, title: info.video_details.title });
-        this.queue.push({ url: info.video_details.url, title: info.video_details.title });
+        songs.push({ url: info.video_details.url, title: info.video_details.title, type: "youtube" });
+        this.queue.push({ url: info.video_details.url, title: info.video_details.title, type: "youtube" });
         return songs;
       } catch (error) {
         this.container.logger.fatal(error);
@@ -253,6 +315,12 @@ export class UserCommand extends Subcommand {
   };
 
   private playCurrentSong = async (): Promise<void> => {
+    if (this.queue[0].type === "spotify") {
+      const searched = await search(`${this.queue[0].title}`, {
+        limit: 1,
+      });
+      this.queue[0].url = searched[0].url;
+    }
     const playStream = await stream(this.queue[0].url);
     const resource = createAudioResource(playStream.stream, { inputType: playStream.type });
     this.player?.play(resource);
