@@ -143,24 +143,26 @@ export class UserCommand extends Subcommand {
             noSubscriber: NoSubscriberBehavior.Play,
           },
         });
-      }
-      if (this.player.state.status !== AudioPlayerStatus.Playing) {
-        this.playCurrentSong();
+        if (this.player.state.status !== AudioPlayerStatus.Playing) {
+          this.playCurrentSong();
+        }
+
+        this.player.on(AudioPlayerStatus.Idle, () => {
+          this.queue.shift();
+          if (this.queue.length > 0) {
+            this.playCurrentSong();
+          } else {
+            this.closeConnection();
+          }
+        });
       }
 
-      this.player.on(AudioPlayerStatus.Idle, () => {
-        this.queue.shift();
-        if (this.queue.length > 0) {
-          this.playCurrentSong();
-        } else {
-          this.closeConnection();
-        }
-      });
       this.connection.subscribe(this.player);
 
       this.connection.on(VoiceConnectionStatus.Destroyed, () => {
         this.queue = [];
       });
+
       this.connection.on(VoiceConnectionStatus.Disconnected, () => {
         this.queue = [];
         this.closeConnection();
@@ -250,10 +252,9 @@ export class UserCommand extends Subcommand {
 
     if (validatedUrl === "sp_track" || validatedUrl === "sp_album" || validatedUrl === "sp_playlist") {
       const spData = await spotify(url);
-      this.container.logger.info(validatedUrl);
       if (validatedUrl === "sp_track") {
         const searched = await search(
-          `${(spData as SpotifyTrack).artists?.map((artist) => artist.name).join(", ")} | ${(spData as SpotifyTrack).name}`,
+          `${(spData as SpotifyTrack).artists?.map((artist) => artist.name).join(", ")} | ${(spData as SpotifyTrack).name} lyrics`,
           {
             limit: 1,
           },
@@ -264,16 +265,15 @@ export class UserCommand extends Subcommand {
 
       if (validatedUrl === "sp_album" || validatedUrl === "sp_playlist") {
         const allTracks = await (spData as SpotifyPlaylist | SpotifyAlbum).all_tracks();
-        this.container.logger.info(allTracks.map((track) => track.name));
         for (const track of allTracks) {
           songs.push({
             url: track.url,
-            title: `${track.artists?.map((artist) => artist.name).join(", ")} | ${track.name}`,
+            title: `${track.artists?.map((artist) => artist.name).join(", ")} | ${track.name} lyrics`,
             type: "spotify",
           });
           this.queue.push({
             url: track.url,
-            title: `${track.artists?.map((artist) => artist.name).join(", ")} | ${track.name}`,
+            title: `${track.artists?.map((artist) => artist.name).join(", ")} | ${track.name} lyrics`,
             type: "spotify",
           });
         }
@@ -328,6 +328,8 @@ export class UserCommand extends Subcommand {
 
   private closeConnection = (): void => {
     this.connection?.destroy();
+    this.player?.stop();
+    this.player = null;
     this.connection = null;
   };
 }
