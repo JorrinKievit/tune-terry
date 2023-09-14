@@ -295,7 +295,7 @@ export class UserCommand extends Subcommand {
         return songs;
       } catch (error) {
         this.container.logger.fatal(error);
-        throw new Error("Invalid playlist URL!");
+        throw new Error(formatError(error));
       }
     }
 
@@ -307,7 +307,7 @@ export class UserCommand extends Subcommand {
         return songs;
       } catch (error) {
         this.container.logger.fatal(error);
-        throw new Error("Invalid watch URL!");
+        throw new Error(formatError(error));
       }
     }
 
