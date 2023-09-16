@@ -250,10 +250,7 @@ export class UserCommand extends Subcommand {
     if (this.queue.length === 0) {
       return interaction.reply({ content: "There are no songs in the queue!", ephemeral: true });
     }
-    const currentSong = this.queue[0];
-    this.queue = this.queue.slice(1);
-    this.queue = this.queue.sort(() => Math.random() - 0.5);
-    this.queue.unshift(currentSong);
+    this.queue = [this.queue[0], ...this.queue.slice(1).sort(() => Math.random() - 0.5)];
     return interaction.reply({ content: "Shuffled the queue!" });
   }
 
