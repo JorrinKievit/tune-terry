@@ -72,6 +72,11 @@ interface MusicQueue {
       type: "method",
       chatInputRun: "current",
     },
+    {
+      name: "shuffle",
+      type: "method",
+      chatInputRun: "shuffle",
+    },
   ],
 })
 export class UserCommand extends Subcommand {
@@ -247,11 +252,16 @@ export class UserCommand extends Subcommand {
   }
 
   public async shuffle(interaction: Subcommand.ChatInputCommandInteraction): Promise<InteractionResponse<boolean>> {
-    if (this.queue.length === 0) {
-      return interaction.reply({ content: "There are no songs in the queue!", ephemeral: true });
+    try {
+      if (this.queue.length === 0) {
+        return await interaction.reply({ content: "There are no songs in the queue!", ephemeral: true });
+      }
+      this.queue = [this.queue[0], ...this.queue.slice(1).sort(() => Math.random() - 0.5)];
+      return await interaction.reply({ content: "Shuffled the queue!" });
+    } catch (error) {
+      this.container.logger.fatal(error);
+      return interaction.reply({ content: formatError(error), ephemeral: true });
     }
-    this.queue = [this.queue[0], ...this.queue.slice(1).sort(() => Math.random() - 0.5)];
-    return interaction.reply({ content: "Shuffled the queue!" });
   }
 
   private addQueue = async (url: string): Promise<MusicQueue[]> => {
