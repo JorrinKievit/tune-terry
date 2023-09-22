@@ -272,19 +272,24 @@ export class UserCommand extends Subcommand {
     if (validatedUrl === "sp_track" || validatedUrl === "sp_album" || validatedUrl === "sp_playlist") {
       const spData = await spotify(url);
       if (validatedUrl === "sp_track") {
-        const searched = await search(
-          `${(spData as SpotifyTrack).artists?.map((artist) => artist.name).join(", ")} | ${(spData as SpotifyTrack).name} lyrics`,
-          {
-            limit: 1,
-          },
-        );
-        songs.push({ url: searched[0].url, title: searched[0].title, type: "youtube" });
-        this.queue.push({ url: searched[0].url, title: searched[0].title, type: "youtube" });
+        if (spData.name) {
+          const searched = await search(
+            `${(spData as SpotifyTrack).artists?.map((artist) => artist.name).join(", ")} | ${(spData as SpotifyTrack).name} lyrics`,
+            {
+              limit: 1,
+            },
+          );
+          songs.push({ url: searched[0].url, title: searched[0].title, type: "youtube" });
+          this.queue.push({ url: searched[0].url, title: searched[0].title, type: "youtube" });
+        } else {
+          throw new Error("No video found for the supplied Spotify URL");
+        }
       }
 
       if (validatedUrl === "sp_album" || validatedUrl === "sp_playlist") {
         const allTracks = await (spData as SpotifyPlaylist | SpotifyAlbum).all_tracks();
         for (const track of allTracks) {
+          if (!track.name) continue;
           songs.push({
             url: track.url,
             title: `${track.artists?.map((artist) => artist.name).join(", ")} | ${track.name} lyrics`,
@@ -308,6 +313,7 @@ export class UserCommand extends Subcommand {
         });
         const videos = await info.all_videos();
         for (const video of videos) {
+          if (!video.title) continue;
           songs.push({ url: video.url, title: video.title, type: "youtube" });
           this.queue.push({ url: video.url, title: video.title, type: "youtube" });
         }
