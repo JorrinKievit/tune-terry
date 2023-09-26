@@ -5,11 +5,10 @@ import express from "express";
 
 config();
 
-const app = express(); // Create an Express app
+const app = express();
 
-// Define a simple health check endpoint
-app.get("/health", (request, res) => {
-  res.status(200).send("healthy");
+app.get("/health", (_, response) => {
+  response.status(200).send();
 });
 
 app.listen(3000);
