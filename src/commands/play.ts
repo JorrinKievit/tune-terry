@@ -268,7 +268,6 @@ export class UserCommand extends Subcommand {
     const songs: MusicQueue[] = [];
 
     const validatedUrl = await validate(url);
-
     if (validatedUrl === "sp_track" || validatedUrl === "sp_album" || validatedUrl === "sp_playlist") {
       const spData = await spotify(url);
       if (validatedUrl === "sp_track") {
@@ -319,7 +318,6 @@ export class UserCommand extends Subcommand {
         }
         return songs;
       } catch (error) {
-        this.container.logger.fatal(error);
         throw new Error(formatError(error));
       }
     }
@@ -331,7 +329,6 @@ export class UserCommand extends Subcommand {
         this.queue.push({ url: info.video_details.url, title: info.video_details.title, type: "youtube" });
         return songs;
       } catch (error) {
-        this.container.logger.fatal(error);
         throw new Error(formatError(error));
       }
     }
