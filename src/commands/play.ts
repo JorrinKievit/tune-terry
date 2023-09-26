@@ -325,13 +325,9 @@ export class UserCommand extends Subcommand {
     if (validatedUrl === "yt_video") {
       try {
         const info = await video_info(url);
-        if (info.video_details) {
-          songs.push({ url: info.video_details.url, title: info.video_details.title, type: "youtube" });
-          this.queue.push({ url: info.video_details.url, title: info.video_details.title, type: "youtube" });
-          return songs;
-        } else {
-          throw new Error("Invalid video details.");
-        }
+        songs.push({ url: info.video_details.url, title: info.video_details.title, type: "youtube" });
+        this.queue.push({ url: info.video_details.url, title: info.video_details.title, type: "youtube" });
+        return songs;
       } catch (error) {
         throw new Error(formatError(error));
       }
