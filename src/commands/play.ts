@@ -11,7 +11,20 @@ import {
 import { ApplyOptions } from "@sapphire/decorators";
 import { Subcommand } from "@sapphire/plugin-subcommands";
 import { InteractionResponse } from "discord.js";
-import { is_expired, refreshToken, search, setToken, stream } from "play-dl";
+import {
+  is_expired,
+  playlist_info,
+  refreshToken,
+  search,
+  setToken,
+  spotify,
+  SpotifyAlbum,
+  SpotifyPlaylist,
+  SpotifyTrack,
+  stream,
+  validate,
+  video_info,
+} from "play-dl";
 
 import { formatError } from "../utils/error";
 
@@ -251,78 +264,77 @@ export class UserCommand extends Subcommand {
     }
   }
 
-  private addQueue = (url: string): Promise<MusicQueue[]> => {
-    // const songs: MusicQueue[] = [];
-    console.log(url);
+  private addQueue = async (url: string): Promise<MusicQueue[]> => {
+    const songs: MusicQueue[] = [];
 
-    // const validatedUrl = await validate(url);
+    const validatedUrl = await validate(url);
 
-    // if (validatedUrl === "sp_track" || validatedUrl === "sp_album" || validatedUrl === "sp_playlist") {
-    //   const spData = await spotify(url);
-    //   if (validatedUrl === "sp_track") {
-    //     if (spData.name) {
-    //       const searched = await search(
-    //         `${(spData as SpotifyTrack).artists?.map((artist) => artist.name).join(", ")} | ${(spData as SpotifyTrack).name} lyrics`,
-    //         {
-    //           limit: 1,
-    //         },
-    //       );
-    //       songs.push({ url: searched[0].url, title: searched[0].title, type: "youtube" });
-    //       this.queue.push({ url: searched[0].url, title: searched[0].title, type: "youtube" });
-    //     } else {
-    //       throw new Error("No video found for the supplied Spotify URL");
-    //     }
-    //   }
+    if (validatedUrl === "sp_track" || validatedUrl === "sp_album" || validatedUrl === "sp_playlist") {
+      const spData = await spotify(url);
+      if (validatedUrl === "sp_track") {
+        if (spData.name) {
+          const searched = await search(
+            `${(spData as SpotifyTrack).artists?.map((artist) => artist.name).join(", ")} | ${(spData as SpotifyTrack).name} lyrics`,
+            {
+              limit: 1,
+            },
+          );
+          songs.push({ url: searched[0].url, title: searched[0].title, type: "youtube" });
+          this.queue.push({ url: searched[0].url, title: searched[0].title, type: "youtube" });
+        } else {
+          throw new Error("No video found for the supplied Spotify URL");
+        }
+      }
 
-    //   if (validatedUrl === "sp_album" || validatedUrl === "sp_playlist") {
-    //     const allTracks = await (spData as SpotifyPlaylist | SpotifyAlbum).all_tracks();
-    //     for (const track of allTracks) {
-    //       if (!track.name) continue;
-    //       songs.push({
-    //         url: track.url,
-    //         title: `${track.artists?.map((artist) => artist.name).join(", ")} | ${track.name} lyrics`,
-    //         type: "spotify",
-    //       });
-    //       this.queue.push({
-    //         url: track.url,
-    //         title: `${track.artists?.map((artist) => artist.name).join(", ")} | ${track.name} lyrics`,
-    //         type: "spotify",
-    //       });
-    //     }
-    //   }
+      if (validatedUrl === "sp_album" || validatedUrl === "sp_playlist") {
+        const allTracks = await (spData as SpotifyPlaylist | SpotifyAlbum).all_tracks();
+        for (const track of allTracks) {
+          if (!track.name) continue;
+          songs.push({
+            url: track.url,
+            title: `${track.artists?.map((artist) => artist.name).join(", ")} | ${track.name} lyrics`,
+            type: "spotify",
+          });
+          this.queue.push({
+            url: track.url,
+            title: `${track.artists?.map((artist) => artist.name).join(", ")} | ${track.name} lyrics`,
+            type: "spotify",
+          });
+        }
+      }
 
-    //   return songs;
-    // }
+      return songs;
+    }
 
-    // if (validatedUrl === "yt_playlist") {
-    //   try {
-    //     const info = await playlist_info(url, {
-    //       incomplete: true,
-    //     });
-    //     const videos = await info.all_videos();
-    //     for (const video of videos) {
-    //       if (!video.title) continue;
-    //       songs.push({ url: video.url, title: video.title, type: "youtube" });
-    //       this.queue.push({ url: video.url, title: video.title, type: "youtube" });
-    //     }
-    //     return songs;
-    //   } catch (error) {
-    //     this.container.logger.fatal(error);
-    //     throw new Error(formatError(error));
-    //   }
-    // }
+    if (validatedUrl === "yt_playlist") {
+      try {
+        const info = await playlist_info(url, {
+          incomplete: true,
+        });
+        const videos = await info.all_videos();
+        for (const video of videos) {
+          if (!video.title) continue;
+          songs.push({ url: video.url, title: video.title, type: "youtube" });
+          this.queue.push({ url: video.url, title: video.title, type: "youtube" });
+        }
+        return songs;
+      } catch (error) {
+        this.container.logger.fatal(error);
+        throw new Error(formatError(error));
+      }
+    }
 
-    // if (validatedUrl === "yt_video") {
-    //   try {
-    //     const info = await video_info(url);
-    //     songs.push({ url: info.video_details.url, title: info.video_details.title, type: "youtube" });
-    //     this.queue.push({ url: info.video_details.url, title: info.video_details.title, type: "youtube" });
-    //     return songs;
-    //   } catch (error) {
-    //     this.container.logger.fatal(error);
-    //     throw new Error(formatError(error));
-    //   }
-    // }
+    if (validatedUrl === "yt_video") {
+      try {
+        const info = await video_info(url);
+        songs.push({ url: info.video_details.url, title: info.video_details.title, type: "youtube" });
+        this.queue.push({ url: info.video_details.url, title: info.video_details.title, type: "youtube" });
+        return songs;
+      } catch (error) {
+        this.container.logger.fatal(error);
+        throw new Error(formatError(error));
+      }
+    }
 
     throw new Error("Invalid URL!");
   };
