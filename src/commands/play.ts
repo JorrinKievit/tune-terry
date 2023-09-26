@@ -153,14 +153,14 @@ export class UserCommand extends Subcommand {
           this.playCurrentSong();
         }
 
-        this.player.on(AudioPlayerStatus.Idle, () => {
-          this.queue.shift();
-          if (this.queue.length > 0) {
-            this.playCurrentSong();
-          } else {
-            this.closeConnection();
-          }
-        });
+        // this.player.on(AudioPlayerStatus.Idle, () => {
+        //   this.queue.shift();
+        //   if (this.queue.length > 0) {
+        //     this.playCurrentSong();
+        //   } else {
+        //     this.closeConnection();
+        //   }
+        // });
       }
 
       this.connection.subscribe(this.player);
