@@ -153,14 +153,14 @@ export class UserCommand extends Subcommand {
           this.playCurrentSong();
         }
 
-        // this.player.on(AudioPlayerStatus.Idle, () => {
-        //   this.queue.shift();
-        //   if (this.queue.length > 0) {
-        //     this.playCurrentSong();
-        //   } else {
-        //     this.closeConnection();
-        //   }
-        // });
+        this.player.on(AudioPlayerStatus.Idle, () => {
+          this.queue.shift();
+          if (this.queue.length > 0) {
+            this.playCurrentSong();
+          } else {
+            this.closeConnection();
+          }
+        });
       }
 
       this.connection.subscribe(this.player);
@@ -325,9 +325,13 @@ export class UserCommand extends Subcommand {
     if (validatedUrl === "yt_video") {
       try {
         const info = await video_info(url);
-        songs.push({ url: info.video_details.url, title: info.video_details.title, type: "youtube" });
-        this.queue.push({ url: info.video_details.url, title: info.video_details.title, type: "youtube" });
-        return songs;
+        if (info.video_details) {
+          songs.push({ url: info.video_details.url, title: info.video_details.title, type: "youtube" });
+          this.queue.push({ url: info.video_details.url, title: info.video_details.title, type: "youtube" });
+          return songs;
+        } else {
+          throw new Error("Invalid video details.");
+        }
       } catch (error) {
         throw new Error(formatError(error));
       }
