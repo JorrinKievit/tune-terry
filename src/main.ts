@@ -1,17 +1,8 @@
 import { LogLevel, SapphireClient } from "@sapphire/framework";
 import { GatewayIntentBits, Partials } from "discord.js";
 import { config } from "dotenv";
-import express from "express";
 
 config();
-
-const app = express();
-
-app.get("/health", (_, response) => {
-  response.status(200).send();
-});
-
-app.listen(3000);
 
 const client = new SapphireClient({
   defaultPrefix: "!tt",
