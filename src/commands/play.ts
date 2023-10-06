@@ -273,7 +273,7 @@ export class UserCommand extends Subcommand {
       if (validatedUrl === "sp_track") {
         if (spData.name) {
           const searched = await search(
-            `${(spData as SpotifyTrack).artists?.map((artist) => artist.name).join(", ")} | ${(spData as SpotifyTrack).name} lyrics`,
+            `${(spData as SpotifyTrack).artists?.map((artist) => artist.name).join(", ")} | ${(spData as SpotifyTrack).name}`,
             {
               limit: 1,
             },
@@ -291,12 +291,12 @@ export class UserCommand extends Subcommand {
           if (!track.name) continue;
           songs.push({
             url: track.url,
-            title: `${track.artists?.map((artist) => artist.name).join(", ")} | ${track.name} lyrics`,
+            title: `${track.artists?.map((artist) => artist.name).join(", ")} | ${track.name}`,
             type: "spotify",
           });
           this.queue.push({
             url: track.url,
-            title: `${track.artists?.map((artist) => artist.name).join(", ")} | ${track.name} lyrics`,
+            title: `${track.artists?.map((artist) => artist.name).join(", ")} | ${track.name}`,
             type: "spotify",
           });
         }
